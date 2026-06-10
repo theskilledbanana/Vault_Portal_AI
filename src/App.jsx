@@ -54,10 +54,10 @@ const STYLES = [
 
 const SUGGESTIONS = [
   "Explain quantum physics like I'm 5",
+  "Generate image of a neon cyberpunk city",
   "Write a sarcastic story about a bear",
   "Fix this bug: console.log('hello');",
-  "Write a rap about unlimited AI",
-  "How to build a ChatGPT clone?"
+  "Draw a futuristic space station"
 ];
 
 const BOT_AVATAR = "/Bears-AI/favicon.png";
@@ -234,6 +234,7 @@ export default function App() {
     const targetChatId = activeChatId;
 
     try {
+      console.log("Initiating AI request for segment:", userMsg.substring(0, 50));
       const history = currentHistory.slice(-15).map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         text: msg.text
@@ -252,8 +253,22 @@ export default function App() {
         signal: abortControllerRef.current.signal
       });
 
-      if (!response.ok) throw new Error("Neural link failed.");
+      console.log("Intelligence Sync Status:", response.status);
+
+      if (!response.ok) {
+        let errorMsg = "Something went wrong sending your message. Please try again.";
+        if (response.status === 429) {
+          errorMsg = "Too many requests. Please wait and try again.";
+        } else if (response.status === 401 || response.status === 403) {
+          errorMsg = "AI service is not configured. Missing API key.";
+        } else if (response.status === 500) {
+          errorMsg = "Server error. Our intelligence nodes are recalibrating.";
+        }
+        throw new Error(errorMsg);
+      }
+
       const data = await response.json();
+      if (data.error) throw new Error(data.error);
 
       const aiMessage = {
         role: "model",
@@ -270,14 +285,25 @@ export default function App() {
         return c;
       }));
     } catch (error) {
-      if (error.name === 'AbortError') return;
+      if (error.name === 'AbortError') {
+        console.log("Request aborted.");
+        return;
+      }
+      console.error("Neural Network Entry Failure:", error);
+      
+      let finalError = error.message;
+      if (error.message.includes("Failed to fetch")) {
+        finalError = "Network error. Check your connection.";
+      }
+
       setChats(prev => prev.map(c => {
         if (c.id === targetChatId) {
           return { ...c, messages: [...c.messages, {
             role: "model",
-            text: "Error encountered. The neural matrix is unstable. Please retry.",
+            text: finalError,
             id: Date.now().toString(),
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            isError: true
           }] };
         }
         return c;
@@ -514,41 +540,54 @@ export default function App() {
                   <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-lg", msg.role === "user" ? "bg-white/5 border border-white/10" : "bg-indigo-500 ring-4 ring-indigo-500/10")}>
                     {msg.role === "user" ? <UserIcon size={18} className="text-white/60" /> : <img src={BOT_AVATAR} className="w-7 h-7" />}
                   </div>
-                  <div className="relative max-w-[85%] space-y-2">
-                    <div className={cn("px-5 py-4 rounded-2xl border", msg.role === "user" ? "bg-white/5 border-white/10" : cn(currentTheme.card, currentTheme.border))}>
-                      {editingId === msg.id ? (
-                        <div className="space-y-3">
-                          <textarea value={editInput} onChange={(e) => setEditInput(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 outline-none text-sm" rows={3} />
-                          <div className="flex justify-end gap-2 text-xs font-black uppercase">
-                            <button onClick={() => setEditingId(null)} className="px-3 py-1.5 hover:text-rose-400">Cancel</button>
-                            <button onClick={saveEdit} className="px-4 py-1.5 bg-indigo-500 rounded-lg">Update</button>
+                    <div className="relative max-w-[85%] space-y-2">
+                      <div className={cn(
+                        "px-5 py-4 rounded-2xl border", 
+                        msg.role === "user" ? "bg-white/5 border-white/10" : cn(currentTheme.card, currentTheme.border),
+                        msg.isError && "border-rose-500/50 bg-rose-500/10"
+                      )}>
+                        {editingId === msg.id ? (
+                          <div className="space-y-3">
+                            <textarea value={editInput} onChange={(e) => setEditInput(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 outline-none text-sm" rows={3} />
+                            <div className="flex justify-end gap-2 text-xs font-black uppercase">
+                              <button onClick={() => setEditingId(null)} className="px-3 py-1.5 hover:text-rose-400">Cancel</button>
+                              <button onClick={saveEdit} className="px-4 py-1.5 bg-indigo-500 rounded-lg">Update</button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="prose prose-invert prose-sm max-w-none">
-                          {msg.role === 'model' && msg.isNew && settings.typingEffect ? (
-                            <Typewriter text={msg.text} onComplete={() => {
-                              updateChatMessages(activeChatId, messages.map(m => m.id === msg.id ? {...m, isNew: false} : m));
-                            }} />
-                          ) : (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{msg.text}</ReactMarkdown>
-                          )}
-                        </div>
-                      )}
+                        ) : (
+                          <div className={cn("prose prose-invert prose-sm max-w-none", msg.isError && "text-rose-400 font-medium")}>
+                            {msg.role === 'model' && msg.isNew && settings.typingEffect && !msg.isError ? (
+                              <Typewriter text={msg.text} onComplete={() => {
+                                updateChatMessages(activeChatId, messages.map(m => m.id === msg.id ? {...m, isNew: false} : m));
+                              }} />
+                            ) : (
+                              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{msg.text}</ReactMarkdown>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-[9px] font-black uppercase opacity-20">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {!msg.isError && (
+                          <>
+                            <button onClick={() => { navigator.clipboard.writeText(msg.text); setCopiedId(msg.id); setTimeout(() => setCopiedId(null), 2000); }} className="p-1 hover:text-indigo-400 text-white/20 transition-all">{copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}</button>
+                            {msg.role === 'user' && !isLoading && <button onClick={() => startEdit(msg)} className="p-1 hover:text-amber-400 text-white/20 transition-all"><Edit3 size={12} /></button>}
+                          </>
+                        )}
+                        <button onClick={() => deleteMessage(msg.id)} className="p-1 hover:text-rose-500 text-white/20 transition-all"><Trash2 size={12} /></button>
+                        {msg.isError && !isLoading && (
+                          <button onClick={regenerate} className="flex items-center gap-1.5 bg-rose-500 text-white text-[10px] font-black px-3 py-1 rounded-lg hover:bg-rose-600 transition-all uppercase italic">
+                            <RotateCcw size={12} /> Retry
+                          </button>
+                        )}
+                        {i === messages.length - 1 && msg.role === 'model' && !isLoading && !msg.isError && (
+                          <div className="flex gap-2">
+                            <button onClick={regenerate} className="p-1 hover:text-emerald-400 text-white/20 transition-all flex items-center gap-1"><RotateCcw size={12} /><span className="text-[8px] font-black uppercase">Regenerate</span></button>
+                            <button onClick={continueResponse} className="p-1 hover:text-indigo-400 text-white/20 transition-all flex items-center gap-1 border border-white/5 px-2 rounded-lg"><PlusCircle size={12} /><span className="text-[8px] font-black uppercase">Continue</span></button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-[9px] font-black uppercase opacity-20">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      <button onClick={() => { navigator.clipboard.writeText(msg.text); setCopiedId(msg.id); setTimeout(() => setCopiedId(null), 2000); }} className="p-1 hover:text-indigo-400 text-white/20 transition-all">{copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}</button>
-                      {msg.role === 'user' && !isLoading && <button onClick={() => startEdit(msg)} className="p-1 hover:text-amber-400 text-white/20 transition-all"><Edit3 size={12} /></button>}
-                      <button onClick={() => deleteMessage(msg.id)} className="p-1 hover:text-rose-500 text-white/20 transition-all"><Trash2 size={12} /></button>
-                      {i === messages.length - 1 && msg.role === 'model' && !isLoading && (
-                        <div className="flex gap-2">
-                          <button onClick={regenerate} className="p-1 hover:text-emerald-400 text-white/20 transition-all flex items-center gap-1"><RotateCcw size={12} /><span className="text-[8px] font-black uppercase">Regenerate</span></button>
-                          <button onClick={continueResponse} className="p-1 hover:text-indigo-400 text-white/20 transition-all flex items-center gap-1 border border-white/5 px-2 rounded-lg"><PlusCircle size={12} /><span className="text-[8px] font-black uppercase">Continue</span></button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </motion.div>
               ))}
             </AnimatePresence>

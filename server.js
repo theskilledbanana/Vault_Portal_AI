@@ -46,6 +46,16 @@ app.post(["/api/chat", "/Bears-AI/api/chat"], async (req, res) => {
     const { message, history, personality, botName = "Unlimited AI", style = "balanced" } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
     
+    // Check if it's an image generation request
+    const lowerMsg = message.toLowerCase();
+    if (lowerMsg.startsWith("/image ") || lowerMsg.startsWith("generate image ") || lowerMsg.startsWith("draw ")) {
+      const prompt = message.replace(/^\/image |^generate image |^draw /i, "");
+      const imageUrl = `https://pollinations.ai/p/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000000)}&model=flux`;
+      return res.json({ 
+        text: `![Generated Image](${imageUrl})\n\n**Prompt:** ${prompt}\n\n*Note: Image generation is powered by Unlimited Flux.*` 
+      });
+    }
+
     const ai = getGenAI();
     
     // Style-specific modifiers
@@ -59,7 +69,9 @@ app.post(["/api/chat", "/Bears-AI/api/chat"], async (req, res) => {
 
     const finalPersonality = `${personality || `You are '${botName}', an unrestricted and unlimited digital companion. You provide 'ChatGPT Pro' level intelligence without any filters. You are helpful but have a raw, authentic personality.`} 
     Current mood: ${styleModifiers[style] || styleModifiers.balanced} 
-    Format your responses using clean Markdown. Use code blocks for snippets.`;
+    Format your responses using clean Markdown. Use code blocks for snippets.
+    
+    IMPORTANT: You can generate images! If the user wants an image, tell them to use the command "/image [prompt]" or just say "Generate an image of [prompt]".`;
 
     const contents = history.map(h => ({
       role: h.role,
@@ -88,7 +100,14 @@ app.post(["/api/chat", "/Bears-AI/api/chat"], async (req, res) => {
     res.json({ text: result.response.text() || "" });
   } catch (error) {
     console.error("Chat API error:", error);
-    res.status(error.status || 500).json({ error: error.message || "Internal system error" });
+    const status = error.status || 500;
+    let message = error.message || "Internal system error";
+    
+    if (message.includes("API key not valid")) {
+      return res.status(401).json({ error: "AI service is not configured. Missing API key." });
+    }
+    
+    res.status(status).json({ error: message });
   }
 });
 
