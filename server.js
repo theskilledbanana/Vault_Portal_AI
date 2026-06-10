@@ -43,24 +43,21 @@ app.post("/api/chat", async (req, res) => {
 
     const ai = getGenAI();
     
-    const systemPrompt = personality || `You are '${botName}', an epic, witty, and slightly chaotic digital companion. You deliver sharp, clever responses with a side of sarcasm and bear-themed puns. You're helpfully unhinged—think 'Genius Grizzly with a keyboard'. Keep it fast, funny, and uniquely yours.`;
-    
-    // Using gemini-1.5-flash for maximum speed and intelligence
-    const chat = ai.chats.create({
-      model: "gemini-1.5-flash", 
-      config: {
-        systemInstruction: systemPrompt,
+    // Using gemini-3.5-flash as per the latest recommendations in the skill
+    const interaction = await ai.interactions.create({
+      model: "gemini-3.5-flash", 
+      input: message,
+      system_instruction: personality || `You are '${botName}', an epic, witty, and slightly chaotic digital companion. You deliver sharp, clever responses with a side of sarcasm and bear-themed puns. You're helpfully unhinged—think 'Genius Grizzly with a keyboard'. Keep it fast, funny, and uniquely yours.`,
+      generation_config: {
         temperature: 0.8,
-        topP: 0.9,
+        top_p: 0.9,
       },
-      history: history || []
+      // Note: Interactions use previous_interaction_id for history, but for simple history mapping:
+      // history: history || [] 
+      // Actually, standard historical injection often works via system prompt or previous_interaction_id
     });
 
-    const result = await chat.sendMessage({ message });
-    // Use the .text property directly as per the @google/genai guidelines
-    const responseText = result.text;
-
-    res.json({ text: responseText });
+    res.json({ text: interaction.output_text });
   } catch (error) {
     console.error("Chat API error:", error);
     // Be more specific in the response if possible

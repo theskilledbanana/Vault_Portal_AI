@@ -8,9 +8,8 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import atomDark from 'react-syntax-highlighter/dist/esm/styles/prism/atom-dark.js';
-import prismStyle from 'react-syntax-highlighter/dist/esm/styles/prism/prism.js';
+// import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+// import { atomDark, prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 // Firebase Imports
 import { initializeApp } from 'firebase/app';
@@ -465,15 +464,9 @@ export default function App() {
                                 <span className="text-[10px] font-black uppercase text-slate-500">{match[1]}</span>
                                 <button onClick={() => copyToClipboard(String(children), 'code')} className="p-1 hover:text-white"><Copy size={12} /></button>
                               </div>
-                              <SyntaxHighlighter
-                                language={match[1]}
-                                style={isLight ? prismStyle : atomDark}
-                                PreTag="div"
-                                className="!m-0 !bg-transparent text-sm"
-                                {...props}
-                              >
+                              <pre className="p-4 overflow-auto text-sm bg-black/20 text-indigo-300">
                                 {String(children).replace(/\n$/, '')}
-                              </SyntaxHighlighter>
+                              </pre>
                             </div>
                           ) : (
                             <code className={`${isLight ? 'bg-indigo-50 text-indigo-700' : 'bg-white/10 text-indigo-300'} px-1.5 py-0.5 rounded-md font-mono text-sm`} {...props}>
