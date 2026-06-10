@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "userSettings": {
+      "title": "User Settings",
+      "description": "Personalized settings for the chatbot",
+      "type": "object",
+      "properties": {
+        "botName": {
+          "type": "string",
+          "description": "Custom name for the chatbot"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the user"
+        },
+        "personality": {
+          "type": "string",
+          "description": "Custom system instructions for the AI"
+        },
+        "theme": {
+          "type": "string",
+          "description": "Background theme identifier"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Icon identifier for the bot"
+        }
+      },
+      "required": ["userId", "botName", "personality", "theme", "icon"]
+    }
+  },
+  "firestore": {
+    "/settings/{userId}": {
+      "schema": "userSettings",
+      "description": "User specific settings"
+    }
+  }
+}

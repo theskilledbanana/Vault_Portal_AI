@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidSettings(data) {
+      return data.keys().hasAll(['botName', 'userId', 'personality', 'theme', 'icon']) &&
+             data.botName is string && data.botName.size() <= 32 &&
+             data.personality is string && data.personality.size() <= 500 &&
+             data.theme is string &&
+             data.icon is string &&
+             data.userId == request.auth.uid;
+    }
+
+    match /settings/{userId} {
+      allow get: if isOwner(userId);
+      allow create, update: if isOwner(userId);
+    }
+
+    match /profiles/{userId} {
+      allow get, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/messages/{messageId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}

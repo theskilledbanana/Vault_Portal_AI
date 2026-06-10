@@ -1,0 +1,6 @@
+{
+  "name": "bear's ai",
+  "description": "An epic, witty, and super-clean AI chatbot with a bear-sized personality. Simple, fast, and fun.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
