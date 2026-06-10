@@ -25,12 +25,11 @@ service cloud.firestore {
     }
 
     match /settings/{userId} {
-      allow get: if isOwner(userId);
-      allow create, update: if isOwner(userId);
+      allow read, write: if isOwner(userId);
     }
 
     match /profiles/{userId} {
-      allow get, write: if isOwner(userId);
+      allow read, write: if isOwner(userId);
     }
 
     match /users/{userId}/messages/{messageId} {

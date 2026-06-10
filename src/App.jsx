@@ -13,12 +13,20 @@ import remarkGfm from 'remark-gfm';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, updateProfile } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, collection, query, orderBy, limit, addDoc, serverTimestamp, deleteDoc, getDocs, writeBatch, getDoc } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
-
 // Initialize Firebase
+const firebaseConfig = {
+  projectId: "gen-lang-client-0463005360",
+  appId: "1:920458730295:web:8332277a0f040243c798b2",
+  apiKey: "AIzaSyAHlcHLpXSMfKje2Qahxu400ssM-4wi3Mg",
+  authDomain: "gen-lang-client-0463005360.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-2b3cf94d-550b-491e-8599-44d98179f727",
+  storageBucket: "gen-lang-client-0463005360.firebasestorage.app",
+  messagingSenderId: "920458730295"
+};
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = getFirestore(app, "ai-studio-2b3cf94d-550b-491e-8599-44d98179f727");
 
 const THEMES = {
   midnight: { 
@@ -183,6 +191,8 @@ export default function App() {
     const unsubMessages = onSnapshot(msgsQuery, (snapshot) => {
       const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setMessages(msgs);
+    }, (error) => {
+      console.error("Messages listener error:", error);
     });
 
     return () => {
