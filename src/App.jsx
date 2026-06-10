@@ -97,14 +97,19 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
-        // We have a Firebase user (likely anonymous)
-        // Check if we have profile data in Firestore
-        const profileDoc = await getDoc(doc(db, 'profiles', u.uid));
-        if (profileDoc.exists()) {
-          const profileData = profileDoc.data();
-          setUser({ ...u, displayName: profileData.name, email: profileData.email });
-        } else {
-          setUser(u);
+        try {
+          // Use onSnapshot for profile too for better offline handling
+          const profileRef = doc(db, 'profiles', u.uid);
+          const profileDoc = await getDoc(profileRef);
+          if (profileDoc.exists()) {
+            const profileData = profileDoc.data();
+            setUser({ ...u, displayName: profileData.name, email: profileData.email });
+          } else {
+            setUser(u);
+          }
+        } catch (error) {
+          console.warn("Profile fetch failed (likely offline):", error);
+          setUser(u); // Proceed with the user we have
         }
       } else {
         setUser(null);
@@ -160,8 +165,15 @@ export default function App() {
           icon: "sparkle",
           userId: user.uid
         };
-        setDoc(doc(db, 'settings', user.uid), defaults);
+        // Use try-catch for the initial setDoc to prevent offline crashes
+        try {
+          setDoc(doc(db, 'settings', user.uid), defaults);
+        } catch (e) {
+          console.warn("Initial settings save failed (likely offline):", e);
+        }
       }
+    }, (error) => {
+      console.error("Settings listener error:", error);
     });
 
     // Sync Messages
@@ -278,6 +290,16 @@ export default function App() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const speakMessage = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.1;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   const filteredMessages = messages.filter(m => 
     m.text.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -308,7 +330,7 @@ export default function App() {
           </div>
         </div>
         <h1 className="text-4xl font-black text-white italic mb-2 uppercase tracking-tighter">Bear AI</h1>
-        <p className="text-slate-500 mb-10 font-bold uppercase tracking-[0.2em] text-[10px]">Neural Interface v4.5</p>
+        <p className="text-slate-500 mb-10 font-bold uppercase tracking-[0.2em] text-[10px]">Quantum Interface v5.1</p>
         
         <form onSubmit={(e) => {
           e.preventDefault();
@@ -470,7 +492,13 @@ export default function App() {
                       {copiedId === message.id ? <Check size={14} className="text-emerald-400" /> : <Copy size={12} />}
                     </button>
                     <button className="p-1.5 hover:bg-white/10 rounded-lg"><Share2 size={12} /></button>
-                    <button className="p-1.5 hover:bg-white/10 rounded-lg invisible group-hover:visible"><Volume2 size={12} /></button>
+                    <button 
+                      onClick={() => speakMessage(message.text)}
+                      className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                      title="Read Aloud"
+                    >
+                      <Volume2 size={12} />
+                    </button>
                     <span className="text-[10px] font-black uppercase opacity-40 ml-auto tabular-nums">
                       {message.timestamp?.toDate ? message.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently"}
                     </span>

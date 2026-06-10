@@ -45,9 +45,9 @@ app.post("/api/chat", async (req, res) => {
     
     const systemPrompt = personality || `You are '${botName}', a professional and helpful AI assistant. Always respond quickly and concisely.`;
     
-    // Using gemini-1.5-flash for stability and speed
+    // Using gemini-3.5-flash as per the latest recommendations
     const chat = ai.chats.create({
-      model: "gemini-1.5-flash", 
+      model: "gemini-3.5-flash", 
       config: {
         systemInstruction: systemPrompt,
       },
@@ -55,12 +55,18 @@ app.post("/api/chat", async (req, res) => {
     });
 
     const result = await chat.sendMessage({ message });
+    // Use the .text property directly as per the @google/genai guidelines
     const responseText = result.text;
 
     res.json({ text: responseText });
   } catch (error) {
     console.error("Chat API error:", error);
-    res.status(500).json({ error: error.message || "Failed to process chat" });
+    // Be more specific in the response if possible
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || "Internal system error",
+      details: error.status ? `Status: ${error.status}` : undefined
+    });
   }
 });
 
