@@ -262,6 +262,7 @@ function AppContent() {
   const [botAvatar, setBotAvatar] = useState("/favicon.png");
 
   useEffect(() => {
+    console.log("APP MOUNT SUCCESS");
     FaviconManager.load();
     const saved = localStorage.getItem('unlimited_favicon_v5');
     if (saved) setBotAvatar(saved);
@@ -574,6 +575,7 @@ function AppContent() {
       }));
 
       console.log("Sending request to backend...");
+      console.log("Request payload:", { message: userMsg, style: settings.responseStyle });
       console.log("Waiting for response...");
       
       const response = await fetch(`/api/chat`, {
@@ -616,6 +618,7 @@ function AppContent() {
       }
 
       const data = await response.json();
+      console.log("Response received from backend:", data);
       console.log("Response data received");
 
       const aiMessage = {

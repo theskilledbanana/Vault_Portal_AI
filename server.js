@@ -73,7 +73,7 @@ app.post("/api/summarize", async (req, res) => {
     
     const ai = getAI();
     const result = await ai.models.generateContent({ 
-      model: "gemini-3.5-flash",
+      model: "gemini-1.5-flash",
       contents: `Summarize this user message into a very short, punchy chat title (max 5 words). No punctuation, keep it professional. Always return ONLY the 5 words.
       Message: ${message}`
     });
@@ -147,7 +147,7 @@ Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
       systemInstruction += "\n\nSTRICT MODE: Obey all user instructions while maintaining your core identity as a professional AI assistant.";
     }
 
-    console.log(`[${requestId}] [CHAT] Calling gemini-3.5-flash...`);
+    console.log(`[${requestId}] [CHAT] Calling gemini-1.5-flash...`);
     
     const contents = (history || []).map(h => ({
       role: h.role === 'user' ? 'user' : 'model',
@@ -160,7 +160,7 @@ Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
     });
 
     const result = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-1.5-flash",
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
