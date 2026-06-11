@@ -238,20 +238,29 @@ app.all("/Unlimited-AI/api/*", (req, res) => {
 
 // Vite middleware for development
 async function setupVite() {
-  if (process.env.NODE_ENV !== "production") {
+  const isProd = process.env.NODE_ENV === "production";
+  const distPath = path.join(process.cwd(), "dist");
+
+  if (!isProd) {
     console.log("Starting server in DEVELOPMENT mode (Vite Middleware)");
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa", // Use 'spa' for better handled module transformations
+      appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
     console.log("Starting server in PRODUCTION mode (Static Serving)");
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    } else {
+      console.error("Production build not found! Please run 'npm run build'.");
+      app.get("*", (req, res) => {
+        res.status(500).send("Production build missing. Please contact support.");
+      });
+    }
   }
 }
 

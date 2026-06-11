@@ -160,11 +160,28 @@ class ErrorBoundary extends React.Component {
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, doc, setDoc, deleteDoc, onSnapshot, orderBy, serverTimestamp, updateDoc, getDocFromServer } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  orderBy, 
+  serverTimestamp, 
+  updateDoc, 
+  getDocFromServer,
+  initializeFirestore
+} from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+});
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
