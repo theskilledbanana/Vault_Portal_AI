@@ -1,6 +1,6 @@
 {
-  "name": "Unlimited & Unrestricted AI",
-  "description": "Professional-grade AI intelligence with zero filters, no limits, and ChatGPT Pro features. Fully customizable, fast, and 100% free.",
+  "name": "Unlimited and Unrestricted AI",
+  "description": "Professional-grade AI with zero filters, persistent cloud history, pinning features, and multi-chat support. Fast, secure, and 100% free.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

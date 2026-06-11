@@ -1,38 +1,44 @@
 {
   "entities": {
-    "userSettings": {
-      "title": "User Settings",
-      "description": "Personalized settings for the chatbot",
+    "Chat": {
+      "title": "Chat",
+      "description": "A conversation between a user and the AI",
       "type": "object",
       "properties": {
-        "botName": {
-          "type": "string",
-          "description": "Custom name for the chatbot"
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "messages": { 
+          "type": "array",
+          "description": "List of message objects",
+          "items": { "type": "object" }
         },
-        "userId": {
-          "type": "string",
-          "description": "UID of the user"
-        },
-        "personality": {
-          "type": "string",
-          "description": "Custom system instructions for the AI"
-        },
-        "theme": {
-          "type": "string",
-          "description": "Background theme identifier"
-        },
-        "icon": {
-          "type": "string",
-          "description": "Icon identifier for the bot"
-        }
+        "pinned": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "botName", "personality", "theme", "icon"]
+      "required": ["id", "userId", "title", "messages", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User preferences and identity",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPfp": { "type": "string" },
+        "settings": { "type": "object" }
+      },
+      "required": ["uid", "userName"]
     }
   },
   "firestore": {
-    "/settings/{userId}": {
-      "schema": "userSettings",
-      "description": "User specific settings"
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "User chat documents"
+    },
+    "/userProfiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual user preferences"
     }
   }
 }

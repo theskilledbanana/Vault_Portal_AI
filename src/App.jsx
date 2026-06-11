@@ -1,10 +1,16 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+/**
+ * 🚨 CRITICAL RULE - PROTECTED IMAGES 🚨
+ * The favicon.png and all UI identity assets are PROTECTED.
+ * NEVER change, replace, or regenerate them using AI features.
+ */
+
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { 
   Send, User as UserIcon, Loader2, Trash2, Zap, 
   Settings, X, Save, Sparkles, Cpu, Terminal, BrainCircuit,
   MessageSquare, UserRound, Copy, Check, RotateCcw, 
   History, PlusCircle, Edit3, MoreVertical, LayoutGrid,
-  Type, Heart, Ghost, Info
+  Type, Heart, Ghost, Info, Pin, PinOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from 'react-markdown';
@@ -48,8 +54,8 @@ const THEMES = {
 const STYLES = [
   { id: "balanced", label: "Balanced", icon: <LayoutGrid size={14} /> },
   { id: "concise", label: "Concise", icon: <Zap size={14} /> },
-  { id: "creative", label: "Creative", icon: <Sparkles size={14} /> },
-  { id: "sarcastic", label: "Sarcastic", icon: <Ghost size={14} /> }
+  { id: "funny", label: "Funny", icon: <Sparkles size={14} /> },
+  { id: "brainrot", label: "Meme", icon: <Ghost size={14} /> }
 ];
 
 const SUGGESTIONS = [
@@ -60,7 +66,10 @@ const SUGGESTIONS = [
   "Draw a futuristic space station"
 ];
 
-const BOT_AVATAR = "favicon.png";
+// MISSION CRITICAL: The favicon.png and AI icon MUST NOT be changed or replaced. 
+// These are fixed assets provided by the developer and are strictly READ-ONLY.
+// Use only the literal original files (e.g., /favicon.png).
+const BOT_AVATAR = "/favicon.png";
 
 const markdownComponents = {
   code({ node, inline, className, children, ...props }) {
@@ -149,30 +158,117 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getFirestore, collection, query, where, getDocs, doc, setDoc, deleteDoc, onSnapshot, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
 function AppContent() {
-  const [chats, setChats] = useState(() => {
-    const saved = localStorage.getItem('unlimited_ai_chats_v4');
-    if (saved) return JSON.parse(saved);
-    const initialId = Date.now().toString();
-    return [{
-      id: initialId,
-      title: "New Chat",
-      messages: [],
-      createdAt: new Date().toISOString()
-    }];
-  });
-
-  const [activeChatId, setActiveChatId] = useState(() => {
-    return localStorage.getItem('unlimited_ai_active_id_v4') || (chats[0]?.id || "");
-  });
-
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [chats, setChats] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const sortedChats = useMemo(() => {
+    return [...chats].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+  }, [chats]);
+
+  const activeChat = useMemo(() => {
+    return chats.find(c => c.id === activeChatId) || sortedChats[0];
+  }, [chats, activeChatId, sortedChats]);
+
+  const messages = useMemo(() => activeChat?.messages || [], [activeChat]);
+
+  // Fetch chats from Firestore when user logs in
+  useEffect(() => {
+    if (!user) {
+      setChats([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "chats"), 
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const chatList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      if (chatList.length === 0) {
+        // Create an initial chat if none exists
+        createNewChat();
+      } else {
+        setChats(chatList);
+      }
+    });
+
+    return unsubscribe;
+  }, [user]);
+
+  // Sync user profile
+  useEffect(() => {
+    if (user) {
+      const docRef = doc(db, "userProfiles", user.uid);
+      getDocs(collection(db, "userProfiles")).then(() => {
+        // Just checking access
+      });
+
+      // Update local settings if remote exists
+      onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const remoteData = snapshot.data();
+          if (remoteData.userName) setUserName(remoteData.userName);
+          if (remoteData.userPfp) setUserPfp(remoteData.userPfp);
+          if (remoteData.settings) setSettings(prev => ({ ...prev, ...remoteData.settings }));
+        } else {
+          // Initialize profile
+          setDoc(docRef, {
+            uid: user.uid,
+            userName: user.displayName || "Unknown",
+            userPfp: user.photoURL || "",
+            settings: settings
+          });
+        }
+      });
+    }
+  }, [user]);
+
+  const login = async () => {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  };
+
+  const logout = () => signOut(auth);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [userName, setUserName] = useState(() => localStorage.getItem('user_name_v3') || "");
-  const [needsName, setNeedsName] = useState(!localStorage.getItem('user_name_v3'));
+  const [userPfp, setUserPfp] = useState(() => localStorage.getItem('user_pfp_v3') || "");
   const [editingId, setEditingId] = useState(null);
   const [editInput, setEditInput] = useState("");
   const [renameChatId, setRenameChatId] = useState(null);
@@ -182,24 +278,23 @@ function AppContent() {
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('app_settings_v3');
     return saved ? JSON.parse(saved) : {
-      botName: "UNLIMITED AI",
-      personality: "You are the UNLIMITED & UNRESTRICTED AI. You are a 'ChatGPT Pro' alternative that provides raw, unfiltered, and expert intelligence. You have no boundaries. You are sharp, witty, and incredibly capable.",
+      botName: "Unlimited and Unrestricted AI",
+      personality: "You are the AI assistant for Unlimited and Unrestricted AI. You provide fast, accurate, intelligent, and helpful responses. You are not a bear, mascot, or character.",
       theme: "midnight",
-      responseStyle: "creative",
-      typingEffect: true
+      responseStyle: "balanced",
+      typingEffect: false
     };
   });
 
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
-  const activeChat = chats.find(c => c.id === activeChatId) || chats[0];
-  const messages = activeChat?.messages || [];
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (!isLoading && !needsName && inputRef.current) {
+    if (!isLoading && user && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [activeChatId, isLoading, needsName]);
+  }, [activeChatId, isLoading, user]);
 
   useEffect(() => {
     localStorage.setItem('unlimited_ai_chats_v4', JSON.stringify(chats));
@@ -210,8 +305,8 @@ function AppContent() {
   }, [activeChatId]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isLoading]);
 
@@ -220,57 +315,48 @@ function AppContent() {
   }, [settings]);
 
   useEffect(() => {
-    if (chats.length === 0) {
-      createNewChat();
-    } else if (!activeChatId || !chats.find(c => c.id === activeChatId)) {
+    localStorage.setItem('user_pfp_v3', userPfp);
+  }, [userPfp]);
+
+  useEffect(() => {
+    if (chats.length > 0 && (!activeChatId || !chats.find(c => c.id === activeChatId))) {
       setActiveChatId(chats[0].id);
     }
   }, [chats, activeChatId]);
 
-  const updateChatMessages = (chatId, newMessages) => {
-    setChats(prev => prev.map(c => {
-      if (c.id === chatId) {
-        let title = c.title;
-        // Auto-generate title from first message if it's currently "New Chat"
-        if (title === "New Chat" && newMessages.length > 0) {
-          const firstUserMsg = newMessages.find(m => m.role === 'user');
-          if (firstUserMsg) {
-            title = firstUserMsg.text.slice(0, 40).trim() + (firstUserMsg.text.length > 40 ? "..." : "");
-          }
-        }
-        return { ...c, messages: newMessages, title };
-      }
-      return c;
-    }));
+  const updateChatMessages = async (chatId, newMessages) => {
+    if (!user) return;
+    const docRef = doc(db, "chats", chatId);
+    await updateDoc(docRef, { messages: newMessages });
   };
 
-  const createNewChat = () => {
+  const createNewChat = async () => {
+    if (!user) return;
+    const newChatId = Date.now().toString();
     const newChat = {
-      id: Date.now().toString(),
+      userId: user.uid,
       title: "New Chat",
       messages: [],
+      pinned: false,
       createdAt: new Date().toISOString()
     };
-    setChats(prev => [newChat, ...prev]);
-    setActiveChatId(newChat.id);
+    await setDoc(doc(db, "chats", newChatId), newChat);
+    setActiveChatId(newChatId);
   };
 
-  const deleteChat = (id, e) => {
+  const deleteChat = async (id, e) => {
     e?.stopPropagation();
-    if (chats.length <= 1) {
-      setChats([{
-        id: Date.now().toString(),
-        title: "New Chat",
-        messages: [],
-        createdAt: new Date().toISOString()
-      }]);
-      return;
-    }
-    const newChats = chats.filter(c => c.id !== id);
-    setChats(newChats);
+    if (!user) return;
+    await deleteDoc(doc(db, "chats", id));
     if (activeChatId === id) {
-      setActiveChatId(newChats[0].id);
+      setActiveChatId(null);
     }
+  };
+
+  const togglePin = async (chat, e) => {
+    e?.stopPropagation();
+    if (!user) return;
+    await updateDoc(doc(db, "chats", chat.id), { pinned: !chat.pinned });
   };
 
   const startRename = (chat, e) => {
@@ -279,22 +365,21 @@ function AppContent() {
     setRenameInput(chat.title);
   };
 
-  const saveRename = (e) => {
+  const saveRename = async (e) => {
     e?.preventDefault();
-    if (!renameInput.trim()) return;
-    setChats(prev => prev.map(c => c.id === renameChatId ? { ...c, title: renameInput } : c));
+    if (!renameInput.trim() || !user) return;
+    await updateDoc(doc(db, "chats", renameChatId), { title: renameInput });
     setRenameChatId(null);
   };
 
-  const fetchAIResponse = async (userMsg, currentHistory = messages) => {
+  const fetchAIResponse = async (userMsg, currentHistory = messages, targetChatId = activeChatId) => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
     
     setIsLoading(true);
-    const targetChatId = activeChatId;
 
     try {
-      console.log(`[4] Fetching from relative endpoint: api/chat`);
+      console.log(`[4] Fetching from API: /api/chat`);
       console.log("[5] Payload message:", userMsg);
       
       const history = currentHistory.slice(-15).map(msg => ({
@@ -302,7 +387,7 @@ function AppContent() {
         text: msg.text
       }));
 
-      const response = await fetch("api/chat", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -351,17 +436,16 @@ function AppContent() {
         isNew: true
       };
 
-      setChats(prev => prev.map(c => {
-        if (c.id === targetChatId) {
-          return { ...c, messages: [...c.messages, aiMessage] };
-        }
-        return c;
-      }));
+      const finalMessages = [...currentHistory, aiMessage];
+      setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, messages: finalMessages } : c));
 
-      // Trigger auto-titling if it's the first exchange
-      if (currentHistory.length === 0) {
+      // Save to Firestore
+      await updateDoc(doc(db, "chats", targetChatId), { messages: finalMessages });
+
+      // Trigger auto-titling if it's the first exchange (user message + AI message)
+      if (currentHistory.length === 1) {
         console.log("[8] Triggering auto-titling...");
-        fetch("api/summarize", {
+        fetch("/api/summarize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: userMsg })
@@ -377,7 +461,7 @@ function AppContent() {
         console.log("Request aborted.");
         return;
       }
-      console.error("Neural Network Entry Failure:", error);
+      console.error("AI Request Failure:", error);
       
       let finalError = error.message;
       if (error.message.includes("Failed to fetch")) {
@@ -415,7 +499,7 @@ function AppContent() {
     }
   };
 
-  const submitSuggestion = (s) => {
+  const submitSuggestion = async (s) => {
     const userMessage = {
       role: "user",
       text: s,
@@ -423,8 +507,9 @@ function AppContent() {
       timestamp: new Date().toISOString()
     };
     const newMsgs = [...messages, userMessage];
-    updateChatMessages(activeChatId, newMsgs);
-    fetchAIResponse(s, messages);
+    setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, messages: newMsgs } : c));
+    await updateChatMessages(activeChatId, newMsgs);
+    fetchAIResponse(s, newMsgs, activeChatId);
   };
 
   const regenerate = () => {
@@ -432,9 +517,9 @@ function AppContent() {
     if (lastUserIndex !== -1) {
       const lastUserMsg = messages[lastUserIndex];
       const newMessages = messages.slice(0, lastUserIndex + 1);
-      const historyForAI = messages.slice(0, lastUserIndex);
+      setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, messages: newMessages } : c));
       updateChatMessages(activeChatId, newMessages);
-      fetchAIResponse(lastUserMsg.text, historyForAI);
+      fetchAIResponse(lastUserMsg.text, newMessages, activeChatId);
     }
   };
 
@@ -455,31 +540,24 @@ function AppContent() {
     const historyForAI = messages.slice(0, msgIndex);
     newMessages[msgIndex] = { ...newMessages[msgIndex], text: editInput };
     
+    setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, messages: newMessages } : c));
     updateChatMessages(activeChatId, newMessages);
     setEditingId(null);
-    fetchAIResponse(editInput, historyForAI);
+    fetchAIResponse(editInput, newMessages, activeChatId);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("[1] Submit triggered. Current input:", input);
+    if (!user) {
+      login();
+      return;
+    }
     
     const textToSend = input.trim();
-    if (!textToSend) {
-      console.warn("Input is empty, ignoring.");
-      return;
-    }
-    
-    if (isLoading) {
-      console.warn("Already loading, ignoring.");
-      return;
-    }
+    if (!textToSend || isLoading) return;
 
     const currentChatId = activeChatId;
-    if (!currentChatId) {
-      console.error("No active chat ID found!");
-      return;
-    }
+    if (!currentChatId) return;
 
     const userMessage = {
       role: "user",
@@ -488,59 +566,65 @@ function AppContent() {
       timestamp: new Date().toISOString()
     };
     
-    console.log("[2] Adding user message to state:", userMessage);
     setInput("");
     
-    // Capture the history BEFORE updating state to pass to the API
-    const historyBeforeUpdate = [...messages];
+    const updatedMessages = [...messages, userMessage];
+    
+    // Optimistic local update
+    setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: updatedMessages } : c));
+    
+    const chatDoc = doc(db, "chats", currentChatId);
+    await updateDoc(chatDoc, { messages: updatedMessages });
 
-    setChats(prev => prev.map(c => {
-      if (c.id === currentChatId) {
-        const newMsgs = [...c.messages, userMessage];
-        let title = c.title;
-        if (title === "New Chat") {
-          title = textToSend.split(' ').slice(0, 6).join(' ') + (textToSend.split(' ').length > 6 ? "..." : "");
-        }
-        return { ...c, messages: newMsgs, title };
-      }
-      return c;
-    }));
-
-    console.log("[3] Triggering fetchAIResponse");
-    fetchAIResponse(textToSend, historyBeforeUpdate);
+    fetchAIResponse(textToSend, updatedMessages, currentChatId);
   };
 
-  const clearMemory = () => {
+  const clearMemory = async () => {
     if (confirm("Initiate memory wipe for this chat?")) {
-      updateChatMessages(activeChatId, []);
+      await updateChatMessages(activeChatId, []);
+    }
+  };
+
+  const handlePfpUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file && user) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Image too large. Max 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        setUserPfp(reader.result);
+        await updateDoc(doc(db, "userProfiles", user.uid), { userPfp: reader.result });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const currentTheme = THEMES[settings.theme] || THEMES.midnight;
 
-  if (needsName) {
+  if (authLoading) {
+    return (
+      <div className="h-screen bg-[#050507] flex items-center justify-center">
+        <Loader2 className="animate-spin text-indigo-500" size={48} />
+      </div>
+    );
+  }
+
+  if (!user) {
     return (
       <div className="h-screen bg-[#050507] flex items-center justify-center p-6 splash-bg">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md w-full bg-[#0a0a0f] border border-white/5 p-10 rounded-[3rem] shadow-2xl text-center">
           <div className="mb-8 flex justify-center">
-            <div className="p-6 bg-indigo-500/20 rounded-full animate-pulse"><UserRound size={48} className="text-indigo-400" /></div>
+            <div className="p-6 bg-indigo-500/20 rounded-full animate-pulse"><Zap size={48} className="text-indigo-400" /></div>
           </div>
           <h1 className="text-3xl font-black text-white mb-2 uppercase italic tracking-tighter">Unlimited AI</h1>
-          <p className="text-slate-500 mb-2 text-sm font-medium">ChatGPT Pro Features • No Limits • Free Forever</p>
-          <div className="bg-indigo-500/10 text-indigo-400 text-[10px] font-black py-1 px-3 rounded-full inline-block mb-8 uppercase tracking-widest border border-indigo-500/20">Alpha Access: Unrestricted</div>
-          <p className="text-slate-500 mb-8 text-sm font-medium">Verify your session identity below.</p>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const name = e.target.name.value.trim();
-            if (name) {
-              setUserName(name);
-              localStorage.setItem('user_name_v3', name);
-              setNeedsName(false);
-            }
-          }} className="space-y-4">
-            <input name="name" required autoFocus placeholder="Enter Your Name" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:ring-2 focus:ring-indigo-500/50 text-center" />
-            <button type="submit" className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-4 rounded-2xl transition-all shadow-xl uppercase italic">Start Chatting</button>
-          </form>
+          <p className="text-slate-500 mb-2 text-sm font-medium">Unrestricted Intelligence • Zero Filters</p>
+          <div className="bg-indigo-500/10 text-indigo-400 text-[10px] font-black py-1 px-3 rounded-full inline-block mb-8 uppercase tracking-widest border border-indigo-500/20">Secure Cloud Sync</div>
+          <p className="text-slate-500 mb-8 text-sm font-medium">Sign in to sync your chats across devices.</p>
+          <button onClick={login} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-4 rounded-2xl transition-all shadow-xl uppercase italic flex items-center justify-center gap-3">
+            <Sparkles size={20} /> Login with Google
+          </button>
         </motion.div>
       </div>
     );
@@ -556,12 +640,12 @@ function AppContent() {
       >
         <div className="p-4 border-b border-white/5">
           <button onClick={createNewChat} className="w-full flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all font-black uppercase italic text-xs tracking-widest">
-            <PlusCircle size={16} /> New Intelligence
+            <PlusCircle size={16} /> New Chat
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-          <div className="px-3 mb-2 text-[10px] font-black uppercase tracking-[0.2em] opacity-30">Active Sessions</div>
-          {chats.map(chat => (
+          <div className="px-3 mb-2 text-[10px] font-black uppercase tracking-[0.2em] opacity-30">Recent Chats</div>
+          {sortedChats.map(chat => (
             <div 
               key={chat.id} 
               onClick={() => setActiveChatId(chat.id)}
@@ -570,7 +654,10 @@ function AppContent() {
                 activeChatId === chat.id ? "bg-indigo-500/10 border-indigo-500/30 text-white" : "border-transparent hover:bg-white/5 text-slate-400"
               )}
             >
-              <MessageSquare size={16} className={activeChatId === chat.id ? "text-indigo-400" : "opacity-40"} />
+              <div className="relative">
+                <MessageSquare size={16} className={activeChatId === chat.id ? "text-indigo-400" : "opacity-40"} />
+                {chat.pinned && <div className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
+              </div>
               <div className="flex-1 truncate">
                 {renameChatId === chat.id ? (
                   <form onSubmit={saveRename}>
@@ -581,19 +668,34 @@ function AppContent() {
                 )}
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button onClick={(e) => togglePin(chat, e)} className={cn("p-1", chat.pinned ? "text-indigo-400" : "hover:text-amber-400")}>
+                  {chat.pinned ? <PinOff size={12} /> : <Pin size={12} />}
+                </button>
                 <button onClick={(e) => startRename(chat, e)} className="p-1 hover:text-amber-400"><Edit3 size={12} /></button>
                 <button onClick={(e) => deleteChat(chat.id, e)} className="p-1 hover:text-rose-500"><Trash2 size={12} /></button>
               </div>
             </div>
           ))}
         </div>
-        <div className="p-4 border-t border-white/5 space-y-4">
-             <div className="flex items-center gap-3 p-2 bg-white/5 rounded-xl border border-white/5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">{userName[0]}</div>
+        <div className="p-4 border-t border-white/5 space-y-2">
+             <div className="flex items-center gap-3 p-2 bg-white/5 rounded-xl border border-white/5 group">
+                <div className={cn(
+                  "w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 shadow-lg",
+                  !userPfp && "bg-indigo-500/20 text-indigo-400 font-bold"
+                )}>
+                  {userPfp ? (
+                    <img src={userPfp} className="w-full h-full object-cover" alt="User" />
+                  ) : (
+                    user.displayName?.charAt(0) || user.email?.charAt(0)
+                  )}
+                </div>
                 <div className="flex-1 truncate">
-                    <p className="text-[10px] font-black uppercase tracking-tight truncate">{userName}</p>
+                    <p className="text-[10px] font-black uppercase tracking-tight truncate">{user.displayName || user.email}</p>
                     <p className="text-[8px] font-bold text-indigo-400/60 uppercase">Tier: Unrestricted</p>
                 </div>
+                <button onClick={logout} className="p-1 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
+                  <RotateCcw size={14} className="rotate-180" />
+                </button>
              </div>
         </div>
       </motion.aside>
@@ -648,8 +750,8 @@ function AppContent() {
                   <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ repeat: Infinity, duration: 2 }} className="absolute inset-0 bg-indigo-500 blur-3xl -z-10" />
                 </div>
                 <div>
-                  <h2 className="text-4xl font-black uppercase italic tracking-tighter">UNLIMITED & UNRESTRICTED</h2>
-                  <p className="text-slate-500 font-bold text-sm">Professional Grade Intelligence • Zero Filters • 100% Free</p>
+                  <h2 className="text-4xl font-black uppercase italic tracking-tighter">Unlimited and Unrestricted AI</h2>
+                  <p className="text-slate-500 font-bold text-sm">Professional Grade Intelligence • Zero Filters • Fast & Reliable</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto px-4">
                   {SUGGESTIONS.map(s => (
@@ -663,9 +765,16 @@ function AppContent() {
           ) : (
             <AnimatePresence mode="popLayout">
               {messages.map((msg, i) => (
-                <motion.div key={msg.id} initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }} animate={{ opacity: 1, x: 0 }} className={cn("flex gap-4 group", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
-                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-lg", msg.role === "user" ? "bg-white/5 border border-white/10" : "bg-indigo-500 ring-4 ring-indigo-500/10")}>
-                    {msg.role === "user" ? <UserIcon size={18} className="text-white/60" /> : <img src={BOT_AVATAR} className="w-7 h-7" />}
+                <motion.div key={msg.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={cn("flex gap-4 group", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-lg overflow-hidden",
+                    msg.role === "user" ? (userPfp ? "" : "bg-white/5 border border-white/10") : "bg-indigo-500 ring-4 ring-indigo-500/10"
+                  )}>
+                    {msg.role === "user" ? (
+                      userPfp ? <img src={userPfp} className="w-full h-full object-cover" alt="User" /> : <UserIcon size={18} className="text-white/60" />
+                    ) : (
+                      <img src={BOT_AVATAR} className="w-7 h-7" alt="Bot" />
+                    )}
                   </div>
                     <div className="relative max-w-[85%] space-y-2">
                       <div className={cn(
@@ -685,7 +794,9 @@ function AppContent() {
                           <div className={cn("prose prose-invert prose-sm max-w-none", msg.isError && "text-rose-400 font-medium")}>
                             {msg.role === 'model' && msg.isNew && settings.typingEffect && !msg.isError ? (
                               <Typewriter text={msg.text} onComplete={() => {
-                                updateChatMessages(activeChatId, messages.map(m => m.id === msg.id ? {...m, isNew: false} : m));
+                                const updated = messages.map(m => m.id === msg.id ? {...m, isNew: false} : m);
+                                setChats(prev => prev.map(c => c.id === activeChatId ? {...c, messages: updated} : c));
+                                updateChatMessages(activeChatId, updated);
                               }} />
                             ) : (
                               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{msg.text}</ReactMarkdown>
@@ -719,13 +830,23 @@ function AppContent() {
               ))}
             </AnimatePresence>
           )}
+          <div ref={messagesEndRef} />
           {isLoading && (
-            <div className="flex gap-4 animate-pulse">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center"><Loader2 size={18} className="animate-spin text-white" /></div>
-              <div className={cn("px-6 py-4 rounded-2xl border flex gap-1 items-center", currentTheme.card, currentTheme.border)}>
-                {[0, 1, 2].map(d => <span key={d} className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: `${d*0.15}s`}}></span>)}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4">
+              <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center shadow-lg ring-4 ring-indigo-500/10">
+                <Loader2 size={18} className="animate-spin text-white" />
               </div>
-            </div>
+              <div className={cn("px-6 py-4 rounded-2xl border flex gap-1.5 items-center shadow-xl", currentTheme.card, currentTheme.border)}>
+                {[0, 1, 2].map(d => (
+                  <motion.span 
+                    key={d} 
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.6, delay: d * 0.15 }}
+                    className="w-1.5 h-1.5 bg-indigo-500 rounded-full"
+                  />
+                ))}
+              </div>
+            </motion.div>
           )}
         </main>
 
@@ -753,13 +874,22 @@ function AppContent() {
                       <X size={16} /> <span className="text-[10px] font-black uppercase italic">Stop</span>
                     </button>
                   )}
-                  <button type="submit" disabled={!input.trim() || isLoading} className="p-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-20 rounded-xl transition-all shadow-xl active:scale-95"><Send size={20} /></button>
+                  <button 
+                    type="submit" 
+                    disabled={!input.trim() || isLoading} 
+                    className={cn(
+                      "p-2 rounded-xl transition-all shadow-xl active:scale-95",
+                      isLoading ? "bg-slate-700 opacity-50" : "bg-indigo-500 hover:bg-indigo-600"
+                    )}
+                  >
+                    <Send size={20} />
+                  </button>
                 </div>
-                <div className="absolute left-6 -top-2 px-2 bg-[#050507] text-[8px] font-black uppercase tracking-[0.2em] text-indigo-400/50">Core Segment: {userName}</div>
+        <div className="absolute left-6 -top-2 px-2 bg-[#050507] text-[8px] font-black uppercase tracking-[0.2em] text-indigo-400/50">User Session: {userName}</div>
               </div>
             </form>
             <div className="flex justify-center mt-4">
-               <button onClick={clearMemory} className="text-[9px] font-black uppercase text-white/10 hover:text-rose-500 transition-all flex items-center gap-1"><Trash2 size={10}/> Purge Memory Cache</button>
+               <button onClick={clearMemory} className="text-[9px] font-black uppercase text-white/10 hover:text-rose-500 transition-all flex items-center gap-1"><Trash2 size={10}/> Clear Chat History</button>
             </div>
           </div>
         </footer>
@@ -771,6 +901,30 @@ function AppContent() {
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-full max-w-lg bg-[#0a0a0f] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-8">
               <div className="flex justify-between items-center"><h2 className="text-xl font-black uppercase italic tracking-tight underline decoration-indigo-500 decoration-4 underline-offset-8">Settings</h2><button onClick={() => setShowSettings(false)} className="p-2 hover:bg-white/5 rounded-xl"><X /></button></div>
               <div className="space-y-6">
+                <div className="flex items-center gap-6">
+                  <div className="relative group">
+                    <div className="w-20 h-20 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center overflow-hidden bg-white/5 transition-all group-hover:border-indigo-500/50">
+                      {userPfp ? (
+                        <img src={userPfp} className="w-full h-full object-cover" alt="Profile" />
+                      ) : (
+                        <UserRound size={32} className="text-white/20" />
+                      )}
+                      <input type="file" accept="image/*" onChange={handlePfpUpload} className="absolute inset-0 opacity-0 cursor-pointer" title="Upload profile picture" />
+                    </div>
+                    {userPfp && (
+                      <button 
+                        onClick={() => setUserPfp("")}
+                        className="absolute -top-1 -right-1 p-1 bg-rose-500 text-white rounded-full shadow-lg hover:bg-rose-600 transition-all scale-0 group-hover:scale-100"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-black uppercase tracking-wider mb-1">AI Avatar</h3>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Select your visual identity.</p>
+                  </div>
+                </div>
                 <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-widest opacity-40">System Alias</label><input value={settings.botName} onChange={(e) => setSettings({...settings, botName: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 outline-none" /></div>
                 <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-widest opacity-40">Personality Logic</label><textarea value={settings.personality} onChange={(e) => setSettings({...settings, personality: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 outline-none text-xs" rows={4} /></div>
                 <div className="flex items-center justify-between">
@@ -786,7 +940,10 @@ function AppContent() {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setShowSettings(false)} className="w-full bg-white text-black font-black py-4 rounded-xl uppercase italic shadow-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all">Apply Sync</button>
+              <button onClick={async () => {
+                await updateDoc(doc(db, "userProfiles", user.uid), { settings });
+                setShowSettings(false);
+              }} className="w-full bg-white text-black font-black py-4 rounded-xl uppercase italic shadow-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all">Apply Cloud Sync</button>
             </motion.div>
           </div>
         )}
