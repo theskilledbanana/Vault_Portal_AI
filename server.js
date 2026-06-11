@@ -27,6 +27,7 @@ app.use((req, res, next) => {
 let genAIClient = null;
 function getAI() {
   if (!genAIClient) {
+    console.log("Loading API key...");
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.log("API key missing");
@@ -34,7 +35,7 @@ function getAI() {
       throw new Error("GEMINI_API_KEY is not set");
     }
     console.log("API key loaded successfully");
-    console.log("[INIT] Initializing GoogleGenAI...");
+    console.log("Initializing AI model...");
     genAIClient = new GoogleGenAI({ 
       apiKey,
       httpOptions: {
@@ -122,6 +123,8 @@ app.post("/api/chat", async (req, res) => {
     console.log("Processing message, sending AI request");
     
     const ai = getAI();
+    console.log("Creating AI request...");
+    console.log("Sending request...");
     console.log("Waiting for response...");
     
     const styleModifiers = {
@@ -166,11 +169,18 @@ Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
         systemInstruction: systemInstruction,
         temperature: (style === 'funny' || style === 'brainrot') ? 0.9 : 0.7,
         topP: 1.0,
-      }
+      },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      ]
     });
 
     const aiText = result.text;
     console.log("Response received from AI");
+    console.log("Response received");
     
     if (aiText === undefined) {
       console.error(`[${requestId}] [CHAT] AI returned undefined text. Result:`, JSON.stringify(result));

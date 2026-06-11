@@ -638,8 +638,8 @@ function AppContent() {
 
       // Trigger auto-titling if it's the first exchange (user message + AI message)
       if (currentHistory.length === 1) {
-        console.log("[8] Triggering auto-titling...");
-        fetch(`${import.meta.env.BASE_URL}api/summarize`, {
+        console.log("Triggering auto-titling...");
+        fetch(`/api/summarize`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: userMsg })
@@ -1313,7 +1313,7 @@ function AppContent() {
             </div>
             <div className="text-[7px] flex justify-between mb-2 opacity-50">
               <span className="uppercase">Auth Node</span>
-              <span className="text-indigo-400 font-bold uppercase">{user.isAnonymous ? "ANONYMOUS" : "AUTHENTICATED"}</span>
+              <span className="text-indigo-400 font-bold uppercase">{user?.isAnonymous ? "ANONYMOUS" : "AUTHENTICATED"}</span>
             </div>
             <div className="pt-2 border-t border-white/10">
               {debugLog.length === 0 && <p className="text-[7px] opacity-20 italic">Listening for events...</p>}
