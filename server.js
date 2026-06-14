@@ -73,13 +73,12 @@ app.post("/api/summarize", async (req, res) => {
     if (!message) return res.status(400).json({ error: "Message is required" });
     
     const ai = getAI();
-    const result = await ai.models.generateContent({ 
-      model: "gemini-1.5-flash",
-      contents: `Summarize this user message into a very short, punchy chat title (max 5 words). No punctuation, keep it professional. Always return ONLY the 5 words.
-      Message: ${message}`
-    });
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`Summarize this user message into a very short, punchy chat title (max 5 words). No punctuation, keep it professional. Always return ONLY the 5 words.
+      Message: ${message}`);
     
-    const responseText = result.text;
+    const response = await result.response;
+    const responseText = response.text();
     let title = (responseText || "New Chat").trim();
     title = title.replace(/^["']|["']$/g, '');
     
@@ -97,11 +96,13 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message, history, personality, style = "balanced", strictMode = false } = req.body;
     
+    console.log("Request received");
     if (!message) {
       console.warn(`[${requestId}] [CHAT] Rejecting request: Message missing`);
       return res.status(400).json({ error: "Message is required" });
     }
     
+    console.log("Processing message");
     console.log(`[${requestId}] [CHAT] Payload:`, { 
       msgLen: message.length, 
       histLen: history?.length || 0,
@@ -112,20 +113,18 @@ app.post("/api/chat", async (req, res) => {
     // Image generation bypass
     const lowerMsg = message.toLowerCase();
     if (lowerMsg.startsWith("/image ") || lowerMsg.startsWith("generate image ") || lowerMsg.startsWith("draw ")) {
+      console.log("Processing message, sending AI request (Image generation)");
       console.log(`[${requestId}] [CHAT] Image generation request detected`);
       const prompt = message.replace(/^\/image |^generate image |^draw /i, "");
       const imageUrl = `https://pollinations.ai/p/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000000)}&model=flux`;
+      console.log("Response received from AI (Image URL generated)");
+      console.log("Returning response to client");
       return res.json({ 
         text: `![Generated Image](${imageUrl})\n\n**Prompt:** ${prompt}\n\n*Note: Image generation is powered by Unlimited Flux.*` 
       });
     }
 
     console.log("Processing message, sending AI request");
-    
-    const ai = getAI();
-    console.log("Creating AI request...");
-    console.log("Sending request...");
-    console.log("Waiting for response...");
     
     const styleModifiers = {
       concise: "Be extremely brief and to the point.",
@@ -150,6 +149,12 @@ Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
       systemInstruction += "\n\nSTRICT MODE: Obey all user instructions while maintaining your core identity as a professional AI assistant.";
     }
 
+    const ai = getAI();
+    const model = ai.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: systemInstruction,
+    });
+    
     console.log(`[${requestId}] [CHAT] Calling gemini-1.5-flash...`);
     
     const contents = (history || []).map(h => ({
@@ -162,11 +167,9 @@ Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
       parts: [{ text: message }]
     });
 
-    const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+    const result = await model.generateContent({
       contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
+      generationConfig: {
         temperature: (style === 'funny' || style === 'brainrot') ? 0.9 : 0.7,
         topP: 1.0,
       },
@@ -178,7 +181,8 @@ Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
       ]
     });
 
-    const aiText = result.text;
+    const response = await result.response;
+    const aiText = response.text();
     console.log("Response received from AI");
     console.log("Response received");
     
@@ -229,12 +233,20 @@ async function setupVite() {
     });
     app.use(vite.middlewares);
   } else {
+    console.log("Production mode enabled. Path to assets:", distPath);
     if (fs.existsSync(distPath)) {
+      // Support for base path /Bears-AI/ and root /
+      app.use("/Bears-AI", express.static(distPath));
       app.use(express.static(distPath));
+      
+      app.get("/Bears-AI/*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
       app.get("*", (req, res) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
     } else {
+      console.log("Production build NOT FOUND at:", distPath);
       app.get("*", (req, res) => {
         res.status(500).send("Production build missing.");
       });

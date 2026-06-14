@@ -262,10 +262,13 @@ function AppContent() {
   const [botAvatar, setBotAvatar] = useState("/favicon.png");
 
   useEffect(() => {
+    console.log("INIT START");
+    console.log("APP MOUNT START");
     console.log("APP MOUNT SUCCESS");
     FaviconManager.load();
     const saved = localStorage.getItem('unlimited_favicon_v5');
     if (saved) setBotAvatar(saved);
+    console.log("RENDER COMPLETE");
   }, []);
 
   const handleFaviconUpload = (e) => {
