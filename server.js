@@ -42,7 +42,7 @@ function getAI() {
         headers: {
           'User-Agent': 'aistudio-build',
         },
-        timeout: 120000
+        timeout: 300000
       }
     });
   }
@@ -74,9 +74,9 @@ app.post("/api/summarize", async (req, res) => {
     if (!message) return res.status(400).json({ error: "Message is required" });
     
     const ai = getAI();
-    console.log(`[${requestId}] [SUMMARIZE] REQUEST RECEIVED. Calling gemini-flash-latest...`);
-    const result = await ai.models.generateContent({ 
-      model: "gemini-flash-latest",
+    console.log(`[${requestId}] [SUMMARIZE] REQUEST RECEIVED. Calling gemini-3.5-flash...`);
+    const result = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
       contents: [{
         role: "user",
         parts: [{ text: `Summarize this user message into a very short, punchy chat title (max 5 words). No punctuation, keep it professional. Always return ONLY the 5 words.
@@ -86,7 +86,6 @@ app.post("/api/summarize", async (req, res) => {
     
     console.log(`[${requestId}] [SUMMARIZE] AI RESPONSE RECEIVED`);
     
-    // Safely extract title using response.text property
     const title = (result.text || "New Chat").trim().replace(/^["']|["']$/g, '');
     console.log(`[${requestId}] [SUMMARIZE] EXTRACTED TEXT (Title):`, title);
     
@@ -190,9 +189,9 @@ Response: "A shocking revelation. Since roughly 98% of all code ever written doe
 
     const ai = getAI();
 
-    console.log(`[${requestId}] [CHAT] Calling Gemini model: gemini-flash-latest`);
+    console.log(`[${requestId}] [CHAT] Calling Gemini model: gemini-3.5-flash`);
     const result = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
@@ -203,7 +202,6 @@ Response: "A shocking revelation. Since roughly 98% of all code ever written doe
 
     console.log(`[${requestId}] [CHAT] AI RESPONSE RECEIVED`);
 
-    // Safely extract text from the response object property
     const aiText = result.text;
 
     console.log(`[${requestId}] [CHAT] EXTRACTED TEXT:`, aiText ? `${aiText.substring(0, 50)}...` : "EMPTY");
@@ -308,9 +306,8 @@ async function setupVite() {
 // Start server sequence
 async function startServer() {
   try {
-    // Start listening immediately to avoid "Starting Server" placeholder
     const serverInstance = app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server listening on port ${PORT}`);
+      console.log(`Server stage 1: Listening on port ${PORT}`);
     });
 
     console.log("Initializing Vite...");

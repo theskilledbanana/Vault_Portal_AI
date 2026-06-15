@@ -10,7 +10,12 @@
     <meta name="apple-mobile-web-app-title" content="Unlimited AI" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="loading-fallback" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0a0a0c; color: #d4d4d4; font-family: system-ui, sans-serif; text-align: center;">
+        <h1 style="color: #FEE11A; margin-bottom: 10px;">Vault Portal AI</h1>
+        <p>Connecting to system...</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

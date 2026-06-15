@@ -441,7 +441,7 @@ function AppContent() {
     const saved = localStorage.getItem('app_settings_v3');
     return saved ? JSON.parse(saved) : {
       botName: "Vault Portal AI",
-      personality: "🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: SARCASTIC / WITTY / HELPFUL\nYou are Vault Portal AI. Sharp, funny, and lightly sarcastic. Always answer directly. Humor comes from witty commentary. NO ROLEPLAY. NO ANIMAL THEMES. Speak like a system.",
+      personality: "🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: SARCASTIC / WITTY / HELPFUL\nYou are Vault Portal AI. Sharp, funny, and lightly sarcastic. NO ROLEPLAY. NO ANIMALS. Speak like a system.",
       theme: "campion",
       responseStyle: "balanced",
       typingEffect: false,
@@ -615,10 +615,15 @@ function AppContent() {
       } else {
         const textError = await response.text();
         console.error("Non-JSON error response:", textError.substring(0, 500));
+        
+        if (textError.includes("<title>Starting Server") || textError.includes("Connecting to system")) {
+          throw new Error("System is still warming up. The backend is initializing. Please try sending your message again in 10-15 seconds.");
+        }
+        
         if (response.status === 504 || response.status === 502) {
           throw new Error("System is experiencing heavy load (Gateway Timeout). Please wait a few seconds and try again.");
         }
-        throw new Error(`Server returned non-JSON response (${response.status})`);
+        throw new Error(`Server returned non-JSON response (${response.status}). System might be restarting.`);
       }
       
       if (!response.ok) {
@@ -1294,7 +1299,7 @@ function AppContent() {
                     <button 
                       onClick={() => setSettings({
                         ...settings, 
-                        personality: "🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: SARCASTIC / WITTY / HELPFUL\nYou are Vault Portal AI. Sharp, funny, and lightly sarcastic. Always answer directly. Humor comes from witty commentary. NO ROLEPLAY. NO ANIMAL THEMES. Speak like a system."
+                        personality: "🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: SARCASTIC / WITTY / HELPFUL\nYou are Vault Portal AI. Sharp, funny, and lightly sarcastic. NO ROLEPLAY. NO ANIMALS. Speak like a system."
                       })}
                       className="text-[10px] font-black uppercase text-[#FEE11A] hover:underline flex items-center gap-1"
                     >
