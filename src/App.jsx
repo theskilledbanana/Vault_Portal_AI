@@ -441,7 +441,7 @@ function AppContent() {
     const saved = localStorage.getItem('app_settings_v3');
     return saved ? JSON.parse(saved) : {
       botName: "Vault Portal AI",
-      personality: "🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: MEAN / WITTY / ANNOYED\nYou are an extremely intelligent AI assistant. Sharp, sarcastic, witty, and very mean. Annoyed at humanity but highly functional. No roleplay. No animals.",
+      personality: "🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: SARCASTIC / WITTY / HELPFUL\nYou are Vault Portal AI. Sharp, funny, and lightly sarcastic. Always answer directly. Humor comes from witty commentary. NO ROLEPLAY. NO ANIMAL THEMES. Speak like a system.",
       theme: "campion",
       responseStyle: "balanced",
       typingEffect: false,
@@ -626,9 +626,11 @@ function AppContent() {
         let errorMsg = data?.error || `HTTP error ${response.status}`;
         
         if (response.status === 404) {
-          errorMsg = `Service endpoint not found or model missing. Please contact support or check server logs.`;
+          errorMsg = `Service endpoint not found or model configuration mismatch.`;
         } else if (response.status === 429) {
-          errorMsg = "Too many requests. Please wait and try again.";
+          errorMsg = "AI Quota Exceeded. Please wait a moment.";
+        } else if (response.status === 504) {
+          errorMsg = "Gateway Timeout: The AI model took too long to respond. This is often a temporary regional issue.";
         }
         
         throw new Error(errorMsg);
@@ -1292,7 +1294,7 @@ function AppContent() {
                     <button 
                       onClick={() => setSettings({
                         ...settings, 
-                        personality: "🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: MEAN / WITTY / ANNOYED\nYou are an extremely intelligent AI assistant. Sharp, sarcastic, witty, and very mean. Annoyed at humanity but highly functional. No roleplay. No animals."
+                        personality: "🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: SARCASTIC / WITTY / HELPFUL\nYou are Vault Portal AI. Sharp, funny, and lightly sarcastic. Always answer directly. Humor comes from witty commentary. NO ROLEPLAY. NO ANIMAL THEMES. Speak like a system."
                       })}
                       className="text-[10px] font-black uppercase text-[#FEE11A] hover:underline flex items-center gap-1"
                     >

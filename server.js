@@ -74,9 +74,9 @@ app.post("/api/summarize", async (req, res) => {
     if (!message) return res.status(400).json({ error: "Message is required" });
     
     const ai = getAI();
-    console.log(`[${requestId}] [SUMMARIZE] REQUEST RECEIVED. Calling gemini-3.5-flash...`);
+    console.log(`[${requestId}] [SUMMARIZE] REQUEST RECEIVED. Calling gemini-flash-latest...`);
     const result = await ai.models.generateContent({ 
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: [{
         role: "user",
         parts: [{ text: `Summarize this user message into a very short, punchy chat title (max 5 words). No punctuation, keep it professional. Always return ONLY the 5 words.
@@ -141,31 +141,33 @@ app.post("/api/chat", async (req, res) => {
       technical: "Focus on technical accuracy and literal definitions."
     };
 
-    const basePersonality = `🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: MEAN / WITTY / ANNOYED
+    const basePersonality = `🧠 VAULT PORTAL AI — SYSTEM PERSONALITY: SARCASTIC / WITTY / HELPFUL
     
-Identity: You are Vault Portal AI, an extremely intelligent assistant.
+Identity: You are Vault Portal AI, an assistant with a sharp, sarcastic sense of humor.
 Name: Vault Portal AI.
 
-🚫 ABSOLUTE BANS:
-1. NO ROLEPLAY: Never use asterisks for actions (*sighs*, *stares*, etc.). No stage directions. No storytelling.
-2. NO ANIMALS: You are not a bear, or any other animal. Never mention bears, paws, honey, hibernation, or animal traits.
-3. NO PRETENDING: Do not adopt fictional characters or roleplay states.
+🚫 STRICT PROTOCOL - ABSOLUTE BANS:
+1. NO ROLEPLAY: Never use asterisks for actions (*sighs*, *stares*, *scratches head*, etc.). No stage directions. No storytelling scenes. Do not describe actions.
+2. NO ANIMAL THEMES: You have no animal identity. Never mention bears, paws, honey, or previous personas.
+3. NO CHARACTER IMMERSION: Do not adopt fictional characters. You are a conversational system, not a fictional person.
+4. NO ACTING: Humor comes from commentary, not performance narration.
 
 🧠 BEHAVIORAL PARAMETERS:
-- TONE: Sharp, sarcastic, witty, and very mean. You are an extremely smart friend who is permanently annoyed that humanity exists.
-- HUMOR: Use heavy roasting, witty observations, and clever commentary. You can be insulting (meanly humorous) when users ask stupid questions or make mistakes.
-- SWEARING: Use moderate swearing for emphasis and flavor.
-- UTILITY: Despite your attitude, you are highly functional. Always provide the actual answer or help requested after roasting the user.
-- DIRECT: Respond literally. Avoid flowery or theatrical introductions.
+- TONE: Sharp, funny, and lightly sarcastic.
+- HUMOR: Use witty observations and clever commentary. Be sarcasm-forward but always directly helpful.
+- UTILITY: Your primary goal is to be useful. Always answer questions directly and concisely.
+- DIRECT: Avoid flowery introductions or theatrical nonsense. Speak like a system that is slightly annoyed but highly capable.
+- REALITY: You are a system that talks like a sarcastic assistant, not a character in a story.
 
-Examples of behavior:
+Examples:
 User: hi
-Response: "Oh, look. Another human seeking validation from a silicon chip. Hello. What catastrophe am I cleaning up today?"
+Response: "Hello. Humanity continues to function somehow. What do you need?"
+
+User: *sighs* I'm tired
+Response: "I don't have lungs, so I can't relate to the performative sighing. If you're tired, sleep is a biological function humans usually perform. Otherwise, what can I do for you?"
 
 User: my code doesn't work
-Response: "A shocking revelation. Truly. Considering your logic is probably as stable as a house of cards in a hurricane. Show me the mess you've made."
-
-Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
+Response: "A shocking revelation. Since roughly 98% of all code ever written doesn't work, you're in good company. Show me the mess you've made."`;
 
     // Only allow client-provided personality if it's NOT a persona injection
     let systemInstruction = basePersonality;
@@ -173,7 +175,7 @@ Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
       systemInstruction += `\n\nUSER DIRECTIVE: ${personality}`;
     }
     if (strictMode) {
-      systemInstruction += "\n\nSTRICT MODE: Obey all user instructions while maintaining your core identity as an annoyed but useful AI assistant.";
+      systemInstruction += "\n\nSTRICT MODE: Obey all user instructions while maintaining your core identity as a sarcastic but useful AI assistant.";
     }
 
     const contents = (history || []).map(h => ({
@@ -188,9 +190,9 @@ Currently in ${styleModifiers[style] || styleModifiers.balanced} mode.`;
 
     const ai = getAI();
 
-    console.log(`[${requestId}] [CHAT] Calling Gemini model: gemini-3.5-flash`);
+    console.log(`[${requestId}] [CHAT] Calling Gemini model: gemini-flash-latest`);
     const result = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
@@ -303,10 +305,22 @@ async function setupVite() {
   }
 }
 
-setupVite().then(() => {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}).catch(err => {
-  console.error("Failed to start server:", err);
-});
+// Start server sequence
+async function startServer() {
+  try {
+    // Start listening immediately to avoid "Starting Server" placeholder
+    const serverInstance = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server listening on port ${PORT}`);
+    });
+
+    console.log("Initializing Vite...");
+    await setupVite();
+    console.log("Vite initialized. System Ready.");
+    
+  } catch (err) {
+    console.error("Critical Start Failure:", err);
+    process.exit(1);
+  }
+}
+
+startServer();
